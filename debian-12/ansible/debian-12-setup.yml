@@ -1,0 +1,48 @@
+---
+- name: Debian 12 setup
+  hosts: all
+  become: true
+  vars:
+    vbox_guest_additions_file: /tmp/VBoxGuestAdditions.iso
+    vbox_guest_additions_mount_point: /mnt
+  tasks:
+    - name: Ensure this playbook is running in a Debian 12 machine
+      ansible.builtin.fail:
+        msg: This playbook must be executed on Debian 12!
+      when:
+        - ansible_distribution != 'Debian'
+        - ansible_distribution_major_version != '12'
+
+    - name: Ensure all packages are up-to-date
+      ansible.builtin.apt:
+        name: "*"
+        state: latest
+
+    - name: Run virtualbox-specific tasks
+      when: ansible_virtualization_type == "virtualbox"
+      block:
+        - name: Mount vbox guest additions iso file
+          ansible.posix.mount:
+            path: "{{ vbox_guest_additions_mount_point }}"
+            src: "{{ vbox_guest_additions_file }}"
+            fstype: iso9660
+            opts: ro
+            state: mounted
+
+        - name: Execute vbox guest additions deployment script
+          ansible.builtin.command: "{{ vbox_guest_additions_mount_point }}/VBoxLinuxAdditions.run"
+          register: vbox_modules
+          failed_when:
+            - vbox_modules.rc != 0
+            - vbox_modules.rc != 2
+          changed_when: vbox_modules.rc == 0
+
+        - name: Unmount vbox guest additions iso file
+          ansible.posix.mount:
+            path: "{{ vbox_guest_additions_mount_point }}"
+            state: absent
+
+        - name: Remove vbox guest additions iso file
+          ansible.builtin.file:
+            path: "{{ vbox_guest_additions_file }}"
+            state: absent
