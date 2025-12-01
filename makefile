@@ -10,11 +10,13 @@ ifndef image
 	$(error The image variable is not set! Please define the image variable and try again.)
 endif
 
-.PHONY: build
-build: .check-image-variable
+.PHONY: build-image
+build-image: .check-image-variable
 	cd ${image}/packer && \
 	packer init . && \
-	packer build -var "vagrant_box_version=$(shell date -u +%Y%m%d.%H%M)" .
+	packer build -var "vagrant_box_version=$(shell date -u +%Y%m%d.%H%M)" . && \
+	cd ../../
+	@make -s cleanup
 
 .PHONY: cleanup
 cleanup:
@@ -22,3 +24,12 @@ cleanup:
 	for F in $$FOLDERS_TO_DELETE ; do \
 		find . -type d -iname "$$F" -prune -print -exec rm -rf {} \;; \
 	done
+
+.PHONY: test-image
+test-image: .check-image-variable
+	cd ${image} && \
+	vagrant box update && \
+	vagrant up && \
+	vagrant destroy -f
+	cd ../
+	@make -s cleanup
